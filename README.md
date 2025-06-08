@@ -21,7 +21,12 @@ You can run a simulation of [Ubuntu machine](#simulator) with sensors connected 
 
 ## Demo
 ```shell
-$ python sensors_checking.py 192.168.0.42 iot_user $SSH_PASS
+$ python sensors_checking.py localhost root \
+  --password secret \
+  --port 2222 \
+  --expected-sensors 3 \
+  --temp-range -20 80 \
+  --hum-range 30 50
 Found 2 temp sensors and 2 humidity sensors (total 4)
 Temperature values: [73.3, 8.5]
 Humidity values:    [51.6, 32.4]
