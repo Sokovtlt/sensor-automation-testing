@@ -2,7 +2,6 @@
 *Health‑check for temperature / humidity sensors over SSH*
 
 ![CI](https://img.shields.io/github/actions/workflow/status/Sokovtlt/sensor-automation-testing/ci.yml?branch=main)
-![License](https://img.shields.io/github/license/Sokovtlt/sensor-automation-testing)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 
 
