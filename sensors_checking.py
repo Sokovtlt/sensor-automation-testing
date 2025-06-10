@@ -23,23 +23,40 @@ def ssh_run(host, user, password=None, key=None, cmd="", port=22):
         password (str, optional): SSH password (if not using key).
         key (str, optional): Path to the SSH private key file.
         cmd (str): Command to execute on the remote host.
+        port (int): Port of SSH.
 
     Returns:
         str: Decoded stdout output of the command.
+
+    Raises:
+        Exception: If SSH connection or command execution fails.
     """
-    conn = paramiko.SSHClient()
-    conn.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    if key:
-        conn.connect(host, username=user, key_filename=key, port=port, timeout=10)
-    else:
-        conn.connect(host, username=user, password=password, port=port, timeout=10)
-    stdin, stdout, stderr = conn.exec_command(cmd)
-    err = stderr.read().decode()
-    if err:
-        print(f"SSH command error: {err}", file=sys.stderr)
-    ret = stdout.read().decode()
-    conn.close()
-    return ret
+    conn = None
+    try:
+        conn = paramiko.SSHClient()
+        conn.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        if key:
+            conn.connect(host, username=user, key_filename=key, port=port, timeout=10)
+        else:
+            conn.connect(host, username=user, password=password, port=port, timeout=10)
+
+        stdin, stdout, stderr = conn.exec_command(cmd)
+        err = stderr.read().decode()
+        if err:
+            print(f"SSH command error: {err}", file=sys.stderr)
+
+        return stdout.read().decode()
+
+    except Exception as e:
+        print(f"SSH operation failed: {e}", file=sys.stderr)
+        raise  # Re-raise the exception after cleanup
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception as e:
+                print(f"Warning: Failed to close SSH connection: {e}", file=sys.stderr)
 
 
 def get_sensors_json(host, user, password=None, key=None, port=22):
@@ -66,11 +83,15 @@ def get_sensors_json(host, user, password=None, key=None, port=22):
     try:
         raw = ssh_run(host, user, password=password, key=key, cmd="sensors -j", port=port)
         data = json.loads(raw)
-        if not isinstance(data, dict):
-            raise ValueError("Expected JSON object, got {}".format(type(data).__name__))
         return data
-    except (json.JSONDecodeError, ValueError) as e:
+    except TypeError as e:
+        print(f"Error - non-deserializable data received: {e}")
+        sys.exit(3)
+    except json.JSONDecodeError as e:
         print(f"Error parsing sensors JSON: {e}")
+        sys.exit(3)
+    except ValueError as e:
+        print(f"Unexpected error: {e}")
         sys.exit(3)
 
 
@@ -98,16 +119,21 @@ def flatten_sensors(data):
     flat = {"temp": [], "hum": []}
     for chip in data.values():
         for label, val in chip.items():
-            if label.startswith("temp") and label.endswith("_input"):
-                if not isinstance(val, (int, float)):
-                    print(f"Warning: sensor value {label} is not numeric, skipping")
-                    continue
-                flat["temp"].append(round(val / 1000, 1))
-            if label.startswith("humidity") and label.endswith("_input"):
-                if not isinstance(val, (int, float)):
-                    print(f"Warning: sensor value {label} is not numeric, skipping")
-                    continue
-                flat["hum"].append(round(val / 1000, 1))
+            # Skip non-numeric values
+            if not isinstance(val, (int, float)):
+                print(f"Warning: sensor value {label} is not numeric, skipping")
+                continue
+
+            # Only process actual sensor input fields
+            if not label.endswith("_input"):
+                continue
+
+            # Convert and round
+            value = round(val / 1000, 1)
+            if label.startswith("temp"):
+                flat["temp"].append(value)
+            elif label.startswith("humidity"):
+                flat["hum"].append(value)
     return flat
 
 

@@ -4,6 +4,8 @@ import json
 import paramiko
 import pytest
 
+import sensors_checking
+from .test_data import SAMPLE_JSON
 
 """
 Unit tests for sensors_checking.py:
@@ -12,25 +14,6 @@ Unit tests for sensors_checking.py:
 - Checks range validation for valid and invalid readings.
 - Verifies main() exit codes for missing sensors, out-of-range values, and success.
 """
-
-
-import sensors_checking
-
-SAMPLE_JSON = {
-    "coretemp-isa-0000": {
-        "temp1_input": 25000,
-        "temp2_input": 26000,
-        "humidity1_input": 45000
-    }
-}
-
-
-@pytest.fixture(autouse=True)
-def fake_ssh(monkeypatch):
-    """Mock ssh_run so it always returns the predefined JSON."""
-    def _fake_ssh_run(host, user, password=None, key=None, cmd="", port=22):
-        return json.dumps(SAMPLE_JSON)
-    monkeypatch.setattr(sensors_checking, "ssh_run", _fake_ssh_run)
 
 
 def test_flatten_sensors():
