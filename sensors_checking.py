@@ -140,6 +140,7 @@ def flatten_sensors(data):
 def validate(values, ranges):
     """
     Check sensor values against their acceptable ranges.
+    Check if there are all values for ranges.
 
     Parameters:
         values (dict): {'temp': [...], 'hum': [...]} lists of sensor readings.
@@ -158,19 +159,38 @@ def validate(values, ranges):
             "hum":  (0, 100)    # valid from 0% to 100%
         }
 
-        validate(values, ranges)
+        >>> validate(values, ranges)
         [
             "temp2: -5.0 out of 0..50",
             "temp3: 55.0 out of 0..50",
             "hum2: 120.0 out of 0..100"
         ]
+        >>> validate({"temp": [25.0]}, {"temp": (0, 50)})
+        []
+
+        >>> validate({"temp": [25.0], "hum": [50.0]}, {"temp": (0, 50)})
+        ["WARNING: No range defined for 'hum'", "hum1: 50.0 (no range defined)"]
     """
     issues = []
-    for kind, lst in values.items():
-        lo, hi = ranges[kind]
-        for i, v in enumerate(lst, start=1):
-            if not lo <= v <= hi:
-                issues.append(f"{kind}{i}: {v} out of {lo}..{hi}")
+    # 1. We check that for all types of sensors there are ranges
+    missing_ranges = set(values.keys()) - set(ranges.keys())
+    for sensor_type in missing_ranges:
+        msg = f"WARNING: No range defined for '{sensor_type}'"
+        print(msg, file=sys.stderr)
+        issues.append(msg)
+
+    # 2. Check the values of existing ranges
+    for sensor_type, readings in values.items():
+        if sensor_type not in ranges:
+            # For sensors without a range, add a special mark
+            for i, val in enumerate(readings, start=1):
+                issues.append(f"{sensor_type}{i}: {val} (no range defined)")
+            continue
+
+        lo, hi = ranges[sensor_type]
+        for i, val in enumerate(readings, start=1):
+            if not lo <= val <= hi:
+                issues.append(f"{sensor_type}{i}: {val} out of {lo}..{hi}")
     return issues
 
 
